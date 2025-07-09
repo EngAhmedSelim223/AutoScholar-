@@ -42,8 +42,17 @@ class ProfessorAgent:
         - Disciplinary backgrounds (unless addressing the same questions)
         """
         
-        analysis = call_groq_api(enhanced_prompt)
-        return analysis
+        # Use batch if summaries are many/long
+        if isinstance(refined_summaries, dict) and len(refined_summaries) > 3:
+            prompts = [
+                f"{PROFESSOR_PROMPT.format(summaries=self._format_summaries_dict({k: v}))}\n\nCRITICAL INSTRUCTION: Focus on identifying where papers make conflicting claims..."
+                for k, v in refined_summaries.items()
+            ]
+            analysis_list = call_groq_api(prompts, batch_mode=True)
+            return "\n\n".join(analysis_list)
+        else:
+            analysis = call_groq_api(enhanced_prompt)
+            return analysis
     
     def compare_with_main_paper(self, main_paper_content, reference_insights):
         """
@@ -83,8 +92,17 @@ class ProfessorAgent:
         - How effectively does it position the study within ongoing theoretical debates?
         """
         
-        comparison_report = call_groq_api(enhanced_prompt)
-        return comparison_report
+        # Use batch if reference_insights is a list
+        if isinstance(reference_insights, list) and len(reference_insights) > 3:
+            prompts = [
+                f"{COMPARISON_PROMPT.format(main_paper=discussion_section[:6000], reference_insights=ri)}\n\nREVIEW PAPER ANALYSIS FOCUS: ..."
+                for ri in reference_insights
+            ]
+            comparison_list = call_groq_api(prompts, batch_mode=True)
+            return "\n\n".join(comparison_list)
+        else:
+            comparison_report = call_groq_api(enhanced_prompt)
+            return comparison_report
     
     def generate_final_report(self, main_paper_content, refined_summaries):
         """

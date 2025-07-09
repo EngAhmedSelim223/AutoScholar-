@@ -71,24 +71,42 @@ def process_reference_papers():
     phd_agent = PhDStudentAgent()
     postdoc_agent = PostdocAgent()
     
-    # Phase 1: PhD Student summarizes papers
-    print(f"\n🎓 Phase 1: PhD Student Analysis")
-    summaries = {}
-    
-    for i, paper_path in enumerate(reference_files, 1):
-        print(f"\n--- Processing paper {i}/{len(reference_files)} ---")
-        filename, summary = phd_agent.process_paper_file(paper_path)
-        summaries[filename] = summary
-        time.sleep(1)  # Brief pause between API calls
-    
-    print(f"\n✅ PhD Student completed {len(summaries)} summaries")
-    
-    # Phase 2: Postdoc reviews and refines summaries
-    print(f"\n🔬 Phase 2: Postdoc Review & Refinement")
-    refined_summaries = postdoc_agent.process_summaries(summaries)
-    
+    # === Parallel & Batch Processing ===
+    print(f"\n📚 Extracting text from reference papers (parallel)...")
+    import concurrent.futures
+    pdf_texts = []
+    filenames = [os.path.basename(f) for f in reference_files]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        future_to_file = {executor.submit(extract_text_from_pdf, f): f for f in reference_files}
+        for i, future in enumerate(concurrent.futures.as_completed(future_to_file), 1):
+            file = future_to_file[future]
+            filename = os.path.basename(file)
+            try:
+                text = future.result()
+                pdf_texts.append((filename, text))
+                print(f"  ✅ Extracted: {filename}")
+            except Exception as e:
+                pdf_texts.append((filename, ""))
+                print(f"  ❌ Error extracting {filename}: {e}")
+
+    # Filter out empty texts
+    pdf_texts = [(fn, txt) for fn, txt in pdf_texts if txt.strip()]
+    if not pdf_texts:
+        print("❌ No valid reference papers to process after extraction.")
+        return {}
+
+    # Phase 1: Batch summarize with PhD agent
+    print(f"\n🎓 Phase 1: PhD Student Analysis (batch)...")
+    paper_texts = [txt for _, txt in pdf_texts]
+    phd_summaries = phd_agent.summarize_paper_batch(paper_texts, [fn for fn, _ in pdf_texts])
+
+    # Phase 2: Batch refine with Postdoc agent
+    print(f"\n🔬 Phase 2: Postdoc Review & Refinement (batch)...")
+    postdoc_summaries = postdoc_agent.review_and_refine_batch(phd_summaries, [fn for fn, _ in pdf_texts])
+
+    # Build refined summaries dict
+    refined_summaries = {fn: summ for (fn, _), summ in zip(pdf_texts, postdoc_summaries)}
     print(f"✅ Postdoc completed {len(refined_summaries)} refined summaries")
-    
     return refined_summaries
 
 def generate_final_analysis(main_paper_content, refined_summaries):

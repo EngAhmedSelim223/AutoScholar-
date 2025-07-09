@@ -2,6 +2,25 @@ from utils import call_groq_api, chunk_text
 from config import PHD_STUDENT_PROMPT
 
 class PhDStudentAgent:
+
+    def summarize_paper_batch(self, paper_texts, paper_titles=None):
+        """
+        Summarize a batch of academic papers efficiently using batch API.
+        Args:
+            paper_texts (list of str): List of full texts of papers
+            paper_titles (list of str): Optional list of paper titles for context
+        Returns:
+            list of str: Summaries for each paper
+        """
+        prompts = []
+        for i, text in enumerate(paper_texts):
+            title = paper_titles[i] if paper_titles and i < len(paper_titles) else ""
+            prompt = PHD_STUDENT_PROMPT.format(text=text)
+            if title:
+                prompt = f"Paper Title: {title}\n\n" + prompt
+            prompts.append(prompt)
+        # Use batch API for all
+        return call_groq_api(prompts, batch_mode=True)
     """Agent that simulates a PhD student summarizing academic papers."""
     
     def __init__(self):
@@ -28,15 +47,9 @@ class PhDStudentAgent:
             prompt = PHD_STUDENT_PROMPT.format(text=paper_text)
             return call_groq_api(prompt)
         else:
-            # Multiple chunks - summarize each and then combine
-            chunk_summaries = []
-            
-            for i, chunk in enumerate(chunks):
-                print(f"  Processing chunk {i+1}/{len(chunks)}...")
-                prompt = PHD_STUDENT_PROMPT.format(text=chunk)
-                chunk_summary = call_groq_api(prompt)
-                chunk_summaries.append(chunk_summary)
-            
+            # Multiple chunks - summarize each in batch
+            prompts = [PHD_STUDENT_PROMPT.format(text=chunk) for chunk in chunks]
+            chunk_summaries = call_groq_api(prompts, batch_mode=True)
             # Combine chunk summaries into final summary
             combined_text = "\n\n".join(chunk_summaries)
             final_prompt = f"""
@@ -48,7 +61,6 @@ class PhDStudentAgent:
             
             Please provide a unified, comprehensive summary:
             """
-            
             return call_groq_api(final_prompt)
     
     def process_paper_file(self, paper_path):

@@ -39,23 +39,17 @@ def test_imports():
 def test_api_connection():
     """Test if GROQ API connection works."""
     try:
-        from config import GROQ_API_KEY, GROQ_MODEL
-        from groq import Groq
-        
-        client = Groq(api_key=GROQ_API_KEY)
-        
-        # Simple test call
-        response = client.chat.completions.create(
-            model=GROQ_MODEL,
-            messages=[{"role": "user", "content": "Hello, respond with 'API connection successful'"}],
-            max_tokens=50
-        )
-        
-        result = response.choices[0].message.content
+        from utils import call_groq_api
+        # Test single call
+        result = call_groq_api("Hello, respond with 'API connection successful'")
         print(f"🌐 API Test Response: {result}")
+        # Test batch call
+        batch_results = call_groq_api([
+            "Say 'Batch test 1'", "Say 'Batch test 2'", "Say 'Batch test 3'"
+        ], batch_mode=True)
+        print(f"🌐 Batch API Test Responses: {batch_results}")
         print("✅ GROQ API connection successful!")
         return True
-        
     except Exception as e:
         print(f"❌ API connection error: {e}")
         return False

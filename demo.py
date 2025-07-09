@@ -42,35 +42,52 @@ def demo_run():
         print("❌ No reference papers found")
         return
     
-    # Process only first 3 reference papers for demo
-    demo_refs = ref_files[:3]
+    # Process only first 10 reference papers for demo
+    demo_refs = ref_files[:10]
     print(f"🎯 Demo: Processing {len(demo_refs)} reference papers")
-    
+
     # Initialize agents
     phd_agent = PhDStudentAgent()
     postdoc_agent = PostdocAgent()
     professor_agent = ProfessorAgent()
-    
-    # Process references
-    print("\n📚 Processing Reference Papers...")
-    summaries = {}
-    
-    for i, ref_file in enumerate(demo_refs, 1):
-        filename = os.path.basename(ref_file)
-        print(f"\n--- Paper {i}/{len(demo_refs)}: {filename} ---")
-        
-        try:
-            # PhD Student summarize
-            _, summary = phd_agent.process_paper_file(ref_file)
-            
-            # Postdoc refine
-            refined = postdoc_agent.review_and_refine(summary, filename)
-            
-            summaries[filename] = refined
-            print(f"✅ Completed: {filename}")
-            
-        except Exception as e:
-            print(f"❌ Error processing {filename}: {e}")
+
+    # Step 1: Extract all texts in parallel
+    print("\n📚 Extracting text from reference papers (parallel)...")
+    import concurrent.futures
+    pdf_texts = []
+    filenames = [os.path.basename(f) for f in demo_refs]
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        future_to_file = {executor.submit(extract_text_from_pdf, f): f for f in demo_refs}
+        for i, future in enumerate(concurrent.futures.as_completed(future_to_file), 1):
+            file = future_to_file[future]
+            filename = os.path.basename(file)
+            try:
+                text = future.result()
+                pdf_texts.append((filename, text))
+                print(f"  ✅ Extracted: {filename}")
+            except Exception as e:
+                pdf_texts.append((filename, ""))
+                print(f"  ❌ Error extracting {filename}: {e}")
+
+    # Filter out empty texts
+    pdf_texts = [(fn, txt) for fn, txt in pdf_texts if txt.strip()]
+    if not pdf_texts:
+        print("❌ No valid reference papers to process after extraction.")
+        return
+
+    # Step 2: Batch summarize with PhD agent
+    print("\n🎓 PhD Student Agent: Summarizing papers (batch)...")
+    paper_texts = [txt for _, txt in pdf_texts]
+    phd_summaries = phd_agent.summarize_paper_batch(paper_texts, [fn for fn, _ in pdf_texts])
+
+    # Step 3: Batch refine with Postdoc agent
+    print("\n🔬 Postdoc Agent: Refining summaries (batch)...")
+    postdoc_summaries = postdoc_agent.review_and_refine_batch(phd_summaries, [fn for fn, _ in pdf_texts])
+
+    # Build summaries dict
+    summaries = {fn: summ for (fn, _), summ in zip(pdf_texts, postdoc_summaries)}
+    for fn in summaries:
+        print(f"✅ Completed: {fn}")
     
     # Load main paper
     print(f"\n📖 Loading Main Paper...")

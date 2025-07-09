@@ -2,6 +2,25 @@ from utils import call_groq_api
 from config import POSTDOC_PROMPT
 
 class PostdocAgent:
+
+    def review_and_refine_batch(self, summaries, paper_titles=None):
+        """
+        Refine a batch of summaries efficiently using batch API.
+        Args:
+            summaries (list of str): List of summaries to refine
+            paper_titles (list of str): Optional list of paper titles for context
+        Returns:
+            list of str: Refined summaries
+        """
+        prompts = []
+        for i, summary in enumerate(summaries):
+            title = paper_titles[i] if paper_titles and i < len(paper_titles) else ""
+            prompt = POSTDOC_PROMPT.format(summary=summary)
+            if title:
+                prompt = f"Paper Title: {title}\n\n" + prompt
+            prompts.append(prompt)
+        # Use batch API for all
+        return call_groq_api(prompts, batch_mode=True)
     """Agent that simulates a Postdoc researcher reviewing and refining summaries."""
     
     def __init__(self):
@@ -21,9 +40,14 @@ class PostdocAgent:
         print(f"🔬 {self.name}: Reviewing summary for - {paper_title}")
         
         prompt = POSTDOC_PROMPT.format(summary=summary)
-        refined_summary = call_groq_api(prompt)
-        
-        return refined_summary
+        # Use batch if summary is a list
+        if isinstance(summary, list) and len(summary) > 1:
+            prompts = [POSTDOC_PROMPT.format(summary=s) for s in summary]
+            refined_list = call_groq_api(prompts, batch_mode=True)
+            return refined_list
+        else:
+            refined_summary = call_groq_api(prompt)
+            return refined_summary
     
     def process_summaries(self, summaries_dict):
         """

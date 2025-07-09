@@ -39,28 +39,130 @@ def chunk_text(text, chunk_size=CHUNK_SIZE):
     
     return chunks
 
-def call_groq_api(prompt, max_retries=MAX_RETRIES):
-    """Make API call to GROQ with retry logic."""
+import json
+import threading
+from typing import List, Union
+
+def call_groq_api(prompt_or_prompts: Union[str, List[str]], max_retries=MAX_RETRIES, batch_mode=True, threads=4):
+    """
+    Make API call to GROQ with retry logic. Supports single prompt (sync) or list of prompts (batch).
+    If batch_mode=True and input is a list, uses Groq Batch API for efficiency.
+    If batch_mode=False, uses multithreading for parallel sync calls.
+    """
     client = Groq(api_key=GROQ_API_KEY)
-    
-    for attempt in range(max_retries):
-        try:
-            response = client.chat.completions.create(
-                model=GROQ_MODEL,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=2048
-            )
-            return response.choices[0].message.content
-        
-        except Exception as e:
-            print(f"API call attempt {attempt + 1} failed: {str(e)}")
-            if attempt < max_retries - 1:
-                time.sleep(2 ** attempt)  # Exponential backoff
-            else:
-                raise Exception(f"All {max_retries} API call attempts failed")
+
+    def single_call(prompt):
+        for attempt in range(max_retries):
+            try:
+                response = client.chat.completions.create(
+                    model=GROQ_MODEL,
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.7,
+                    max_tokens=2048
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                print(f"API call attempt {attempt + 1} failed: {str(e)}")
+                if attempt < max_retries - 1:
+                    time.sleep(2 ** attempt)
+                else:
+                    raise Exception(f"All {max_retries} API call attempts failed")
+
+    # Single prompt (sync)
+    if isinstance(prompt_or_prompts, str):
+        return single_call(prompt_or_prompts)
+
+    # List of prompts (batch or parallel)
+    prompts = prompt_or_prompts
+    results = [None] * len(prompts)
+
+    if batch_mode:
+        # --- Batch API logic ---
+        batch_file = "batch_file.jsonl"
+        with open(batch_file, "w", encoding="utf-8") as f:
+            for i, prompt in enumerate(prompts):
+                req = {
+                    "custom_id": f"req-{i}",
+                    "method": "POST",
+                    "url": "/v1/chat/completions",
+                    "body": {
+                        "model": GROQ_MODEL,
+                        "messages": [{"role": "user", "content": prompt}],
+                        "temperature": 0.7,
+                        "max_tokens": 2048
+                    }
+                }
+                f.write(json.dumps(req, ensure_ascii=False) + "\n")
+
+        # Upload batch file
+        file_obj = client.files.create(file=open(batch_file, "rb"), purpose="batch")
+        file_id = getattr(file_obj, "id", None) or file_obj["id"] if isinstance(file_obj, dict) else file_obj.id
+
+        # Create batch job
+        batch = client.batches.create(
+            completion_window="24h",
+            endpoint="/v1/chat/completions",
+            input_file_id=file_id,
+        )
+        batch_id = getattr(batch, "id", None) or batch["id"] if isinstance(batch, dict) else batch.id
+
+        # Wait for batch to complete
+        import time
+        while True:
+            status = client.batches.retrieve(batch_id)
+            # status may be object or dict
+            status_dict = status if isinstance(status, dict) else status.__dict__
+            if status_dict["status"] in ["completed", "failed", "expired", "cancelled"]:
+                break
+            print(f"Batch status: {status_dict['status']}... waiting...")
+            time.sleep(10)
+
+        if status_dict["status"] != "completed":
+            raise Exception(f"Batch job failed or did not complete: {status_dict['status']}")
+
+        # Download results
+        output_file_id = status_dict["output_file_id"]
+        output = client.files.content(output_file_id)
+        # output may be object with write_to_file method
+        if hasattr(output, "write_to_file"):
+            output.write_to_file("batch_results.jsonl")
+        else:
+            # fallback: assume it's bytes
+            with open("batch_results.jsonl", "wb") as f:
+                f.write(output)
+
+        # Map results by custom_id
+        id_to_result = {}
+        with open("batch_results.jsonl", "r", encoding="utf-8") as f:
+            for line in f:
+                obj = json.loads(line)
+                idx = int(obj["custom_id"].split("-")[-1])
+                # Defensive: handle both dict and object for response
+                response_body = obj["response"]["body"] if isinstance(obj["response"], dict) else obj["response"].body
+                id_to_result[idx] = response_body["choices"][0]["message"]["content"]
+        # Return results in order
+        return [id_to_result[i] for i in range(len(prompts))]
+    else:
+        # --- Multithreading for parallel sync calls ---
+        def worker(i, prompt):
+            try:
+                results[i] = single_call(prompt)
+            except Exception as e:
+                results[i] = f"ERROR: {e}"
+
+        threads_list = []
+        for i, prompt in enumerate(prompts):
+            t = threading.Thread(target=worker, args=(i, prompt))
+            threads_list.append(t)
+            t.start()
+            if len(threads_list) >= threads:
+                for t in threads_list:
+                    t.join()
+                threads_list = []
+        # Join any remaining threads
+        for t in threads_list:
+            t.join()
+        return results
 
 def get_pdf_files(folder_path):
     """Get all PDF files from a folder."""
