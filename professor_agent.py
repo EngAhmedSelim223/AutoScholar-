@@ -116,24 +116,39 @@ class ProfessorAgent:
             str: Complete final report
         """
         print(f"🎓 {self.name}: Synthesizing and comparing with main paper...")
-        # Add extra fields as requested by client
+        
+        # Extract Discussion/Conclusion section for better comparison
+        from utils import extract_discussion_section
+        main_paper_discussion = extract_discussion_section(main_paper_content)
+        
+        # Enhanced prompt with explicit comparison requirements
         prof_prompt = f"""
-You are a senior Professor agent. Given the following fragmentation analysis (convergent themes, divergent fragments, integrative links), your task is to:
+You are a senior Professor agent. Given the following fragmentation analysis and the main paper content, your task is to:
 
-1. Synthesize the main theoretical landscape (5-10 key convergences/divergences only)
-2. For each, add:
-   - Concept Match (does the main paper address this concept? Yes/No/Partial)
-   - Theoretical Lens Match (does the main paper use the same theoretical lens? Yes/No/Partial)
-   - Suggested Synthesis Novelty (how could the main paper or field integrate or advance this theme?)
-3. Suggest future research areas based on the fragmentation
+PART 1: SYNTHESIS (5-10 key convergences/divergences only)
+For each major theme from the fragmentation analysis, provide:
+   - Concept Match: Does the main paper address this concept? (Yes/No/Partial)
+   - Theoretical Lens Match: Does the main paper use the same theoretical lens? (Yes/No/Partial)
+   - Suggested Synthesis Novelty: How could the main paper or field integrate or advance this theme?
 
-Compare all this with the main paper's Discussion section.
+PART 2: DETAILED COMPARISON WITH MAIN PAPER
+Compare the fragmentation analysis findings with the main paper's Discussion/Conclusion sections:
+   - What theoretical themes does the main paper emphasize that align with the fragmentation analysis?
+   - What gaps exist between the main paper's focus and the broader literature themes?
+   - How well does the main paper synthesize the convergent themes identified in the literature?
+   - Does the main paper address the divergent fragments found in the literature?
+   - What unique theoretical contributions does the main paper make beyond the reference literature?
+
+PART 3: FUTURE RESEARCH AREAS
+Based on both the fragmentation analysis and the main paper's limitations/future research suggestions.
 
 Fragmentation Analysis:
 {fragmentation_analysis}
 
-Main Paper Content (Discussion/Conclusion):
-{main_paper_content}
+Main Paper Discussion/Conclusion Section:
+{main_paper_discussion}
+
+IMPORTANT: Make sure to include a detailed comparison section that explicitly contrasts the main paper with the fragmentation analysis findings.
 """
         synthesis_report = call_groq_api(prof_prompt)
 

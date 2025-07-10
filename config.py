@@ -5,7 +5,7 @@ load_dotenv()
 
 # GROQ API Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "deepseek-r1-distill-llama-70b")  # Default to deepseek-r1-distill-llama-70b (most powerful model for academic analysis)
+GROQ_MODEL = os.getenv("GROQ_MODEL", "meta-llama/llama-4-maverick-17b-128e-instruct")  # Default to llama-4-scout (fastest & most cost-effective Llama 4 model for academic analysis)
 
 # Processing Configuration
 CHUNK_SIZE = 4000  # Maximum tokens per chunk
@@ -55,13 +55,22 @@ Paper summaries:
 PROFESSOR_PROMPT = """
 You are a senior Professor agent responsible for final synthesis and comparison. Given the fragmentation analysis from Agent 2, your task is to:
 
-1. Synthesize the main theoretical landscape (focus on 5-10 key convergences/divergences only)
-2. For each major theme, evaluate:
+PART 1: SYNTHESIS (focus on 5-10 key convergences/divergences only)
+For each major theme, evaluate:
    - Concept Match: Does the main paper address this concept? (Yes/No/Partial)
    - Theoretical Lens Match: Does the main paper use the same theoretical lens? (Yes/No/Partial)
    - Suggested Synthesis Novelty: How could the main paper or field integrate or advance this theme?
-3. Suggest future research areas based on the fragmentation analysis
-4. Compare findings with the main paper's Discussion/Conclusion sections
+
+PART 2: DETAILED COMPARISON WITH MAIN PAPER
+Compare the fragmentation analysis findings with the main paper's Discussion/Conclusion:
+   - What theoretical themes does the main paper emphasize that align with the literature?
+   - What gaps exist between the main paper's focus and the broader literature themes?
+   - How well does the main paper synthesize the convergent themes?
+   - Does the main paper address the divergent fragments found in the literature?
+   - What unique theoretical contributions does the main paper make?
+
+PART 3: FUTURE RESEARCH AREAS
+Based on fragmentation analysis and main paper limitations.
 
 Fragmentation Analysis:
 {fragmentation_analysis}
@@ -69,27 +78,7 @@ Fragmentation Analysis:
 Main Paper Content:
 {main_paper}
 
-Provide a structured analysis with clear sections for synthesis, comparison, and future research directions.
-"""
-
-PROFESSOR_PROMPT = """
-You are a senior Professor agent responsible for final synthesis and comparison. Given the fragmentation analysis from Agent 2, your task is to:
-
-1. Synthesize the main theoretical landscape (focus on 5-10 key convergences/divergences only)
-2. For each major theme, evaluate:
-   - Concept Match: Does the main paper address this concept? (Yes/No/Partial)
-   - Theoretical Lens Match: Does the main paper use the same theoretical lens? (Yes/No/Partial)
-   - Suggested Synthesis Novelty: How could the main paper or field integrate or advance this theme?
-3. Suggest future research areas based on the fragmentation analysis
-4. Compare findings with the main paper's Discussion/Conclusion sections
-
-Fragmentation Analysis:
-{fragmentation_analysis}
-
-Main Paper Content:
-{main_paper}
-
-Provide a structured analysis with clear sections for synthesis, comparison, and future research directions.
+IMPORTANT: Include a detailed comparison section that explicitly contrasts the main paper with the fragmentation analysis findings.
 """
 
 COMPARISON_PROMPT = """
