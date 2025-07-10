@@ -4,9 +4,15 @@ AutoScholar - Academic Research Analysis System
 
 Main orchestrator that coordinates the PhD Student, Postdoc, and Professor agents
 to analyze academic papers and generate comprehensive research insights.
+
+Updated to match client requirements:
+- Agent 1 (PhD Student): Summarizes papers, saves to file
+- Agent 2 (Postdoc): Analyzes fragmentation, saves to file
+- Agent 3 (Professor): Synthesizes and compares, saves to file
 """
 
 import os
+import sys
 import time
 from datetime import datetime
 
@@ -21,159 +27,300 @@ def print_header():
     print("="*70)
     print("🎓 AUTOSCHOLAR - ACADEMIC RESEARCH ANALYSIS SYSTEM")
     print("="*70)
-    print("Simulating PhD Student → Postdoc → Professor workflow")
+    print("Three-Agent Academic Analysis Pipeline:")
+    print("Agent 1 (PhD Student) → Agent 2 (Postdoc) → Agent 3 (Professor)")
     print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("="*70)
 
-def load_main_paper():
-    """Load and extract text from the main paper."""
-    print("\n📖 STEP 1: Loading Main Paper")
-    print("-" * 40)
+def run_agent_1_only():
+    """Run only Agent 1 (PhD Student) - Paper Summarization."""
+    print("\n� AGENT 1 ONLY: PhD Student Paper Summarization")
+    print("-" * 50)
     
-    if not os.path.exists(MAIN_PAPER_FOLDER):
-        raise FileNotFoundError(f"Main paper folder '{MAIN_PAPER_FOLDER}' not found")
-    
-    pdf_files = get_pdf_files(MAIN_PAPER_FOLDER)
-    
-    if not pdf_files:
-        raise FileNotFoundError(f"No PDF files found in '{MAIN_PAPER_FOLDER}'")
-    
-    if len(pdf_files) > 1:
-        print(f"⚠️  Multiple PDFs found. Using the first one: {os.path.basename(pdf_files[0])}")
-    
-    main_paper_path = pdf_files[0]
-    print(f"📄 Loading: {os.path.basename(main_paper_path)}")
-    
-    main_paper_content = extract_text_from_pdf(main_paper_path)
-    
-    if not main_paper_content.strip():
-        raise ValueError("Could not extract text from main paper PDF")
-    
-    print(f"✅ Successfully loaded main paper ({len(main_paper_content)} characters)")
-    return main_paper_content, os.path.basename(main_paper_path)
-
-def process_reference_papers():
-    """Process all reference papers using PhD Student and Postdoc agents."""
-    print("\n📚 STEP 2: Processing Reference Papers")
-    print("-" * 40)
-    
-    if not os.path.exists(REFERENCES_FOLDER):
-        raise FileNotFoundError(f"References folder '{REFERENCES_FOLDER}' not found")
-    
+    # Load reference papers
     reference_files = get_pdf_files(REFERENCES_FOLDER)
-    
     if not reference_files:
-        raise FileNotFoundError(f"No PDF files found in '{REFERENCES_FOLDER}'")
+        print("❌ No reference papers found!")
+        return
     
-    print(f"📋 Found {len(reference_files)} reference papers to process")
+    print(f"📋 Found {len(reference_files)} reference papers to summarize")
     
-    # Initialize agents
-    phd_agent = PhDStudentAgent()
-    postdoc_agent = PostdocAgent()
+    # Extract texts
+    print("📖 Extracting text from papers...")
+    paper_texts = []
+    paper_titles = []
     
-    # === Parallel & Batch Processing ===
-    print(f"\n📚 Extracting text from reference papers (parallel)...")
-    import concurrent.futures
-    pdf_texts = []
-    filenames = [os.path.basename(f) for f in reference_files]
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-        future_to_file = {executor.submit(extract_text_from_pdf, f): f for f in reference_files}
-        for i, future in enumerate(concurrent.futures.as_completed(future_to_file), 1):
-            file = future_to_file[future]
-            filename = os.path.basename(file)
-            try:
-                text = future.result()
-                pdf_texts.append((filename, text))
-                print(f"  ✅ Extracted: {filename}")
-            except Exception as e:
-                pdf_texts.append((filename, ""))
-                print(f"  ❌ Error extracting {filename}: {e}")
+    for i, file_path in enumerate(reference_files, 1):
+        filename = os.path.basename(file_path)
+        print(f"  Processing {i}/{len(reference_files)}: {filename}")
+        
+        text = extract_text_from_pdf(file_path)
+        if text.strip():
+            paper_texts.append(text)
+            paper_titles.append(filename)
+        else:
+            print(f"    ⚠️  Warning: No text extracted from {filename}")
+    
+    if not paper_texts:
+        print("❌ No valid papers to process!")
+        return
+    
+    # Run Agent 1
+    agent1 = PhDStudentAgent()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = f"agent1_summaries_{timestamp}.txt"
+    
+    summaries = agent1.summarize_paper_batch(
+        paper_texts=paper_texts,
+        paper_titles=paper_titles,
+        save_path=output_file
+    )
+    
+    print(f"\n✅ Agent 1 completed! Summaries saved to: {output_file}")
+    print(f"📊 Total papers summarized: {len(summaries)}")
 
-    # Filter out empty texts
-    pdf_texts = [(fn, txt) for fn, txt in pdf_texts if txt.strip()]
-    if not pdf_texts:
-        print("❌ No valid reference papers to process after extraction.")
-        return {}
-
-    # Phase 1: Batch summarize with PhD agent
-    print(f"\n🎓 Phase 1: PhD Student Analysis (batch)...")
-    paper_texts = [txt for _, txt in pdf_texts]
-    phd_summaries = phd_agent.summarize_paper_batch(paper_texts, [fn for fn, _ in pdf_texts])
-
-    # Phase 2: Batch refine with Postdoc agent
-    print(f"\n🔬 Phase 2: Postdoc Review & Refinement (batch)...")
-    postdoc_summaries = postdoc_agent.review_and_refine_batch(phd_summaries, [fn for fn, _ in pdf_texts])
-
-    # Build refined summaries dict
-    refined_summaries = {fn: summ for (fn, _), summ in zip(pdf_texts, postdoc_summaries)}
-    print(f"✅ Postdoc completed {len(refined_summaries)} refined summaries")
-    return refined_summaries
-
-def generate_final_analysis(main_paper_content, refined_summaries):
-    """Generate final analysis using Professor agent."""
-    print("\n🎓 STEP 3: Professor-Level Analysis")
-    print("-" * 40)
+def run_agent_2_only():
+    """Run only Agent 2 (Postdoc) - Fragmentation Analysis."""
+    print("\n� AGENT 2 ONLY: Postdoc Fragmentation Analysis")
+    print("-" * 50)
     
-    professor_agent = ProfessorAgent()
+    # Check if Agent 1 output exists
+    import glob
+    agent1_files = glob.glob("agent1_summaries_*.txt")
     
-    # Generate comprehensive final report
-    final_report = professor_agent.generate_final_report(main_paper_content, refined_summaries)
+    if not agent1_files:
+        print("❌ No Agent 1 output files found!")
+        print("� Please run Agent 1 first or provide summaries manually.")
+        return
     
-    print("✅ Professor analysis completed")
-    return final_report
+    # Use the most recent Agent 1 output
+    latest_file = max(agent1_files, key=os.path.getmtime)
+    print(f"📄 Using Agent 1 output: {latest_file}")
+    
+    # Parse summaries from Agent 1 output
+    try:
+        with open(latest_file, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # Extract summaries (simple parsing)
+        summaries = []
+        paper_titles = []
+        
+        sections = content.split("## ")
+        for section in sections[1:]:  # Skip header
+            if section.strip():
+                lines = section.strip().split('\n')
+                if lines:
+                    title = lines[0].strip()
+                    summary = '\n'.join(lines[1:]).strip()
+                    summary = summary.replace('='*80, '').strip()
+                    
+                    if summary:
+                        paper_titles.append(title)
+                        summaries.append(summary)
+        
+        print(f"📊 Parsed {len(summaries)} summaries from Agent 1 output")
+        
+    except Exception as e:
+        print(f"❌ Error parsing Agent 1 output: {e}")
+        return
+    
+    # Run Agent 2
+    agent2 = PostdocAgent()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = f"agent2_fragmentation_{timestamp}.txt"
+    
+    fragmentation_analysis = agent2.review_and_refine_batch(
+        summaries=summaries,
+        paper_titles=paper_titles,
+        save_path=output_file
+    )
+    
+    print(f"\n✅ Agent 2 completed! Fragmentation analysis saved to: {output_file}")
+
+def run_agent_3_only():
+    """Run only Agent 3 (Professor) - Final Synthesis."""
+    print("\n🎓 AGENT 3 ONLY: Professor Final Synthesis")
+    print("-" * 50)
+    
+    # Check if Agent 2 output exists
+    import glob
+    agent2_files = glob.glob("agent2_fragmentation_*.txt")
+    
+    if not agent2_files:
+        print("❌ No Agent 2 output files found!")
+        print("💡 Please run Agent 2 first or provide fragmentation analysis manually.")
+        return
+    
+    # Use the most recent Agent 2 output
+    latest_file = max(agent2_files, key=os.path.getmtime)
+    print(f"📄 Using Agent 2 output: {latest_file}")
+    
+    # Load fragmentation analysis
+    try:
+        with open(latest_file, 'r', encoding='utf-8') as f:
+            fragmentation_analysis = f.read()
+        print("📊 Loaded fragmentation analysis from Agent 2")
+    except Exception as e:
+        print(f"❌ Error loading Agent 2 output: {e}")
+        return
+    
+    # Load main paper
+    try:
+        main_paper_files = get_pdf_files(MAIN_PAPER_FOLDER)
+        if not main_paper_files:
+            print("❌ No main paper found!")
+            return
+        
+        main_paper_content = extract_text_from_pdf(main_paper_files[0])
+        main_paper_title = os.path.basename(main_paper_files[0])
+        print(f"📖 Loaded main paper: {main_paper_title}")
+        
+    except Exception as e:
+        print(f"❌ Error loading main paper: {e}")
+        return
+    
+    # Run Agent 3
+    agent3 = ProfessorAgent()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_file = f"agent3_synthesis_{timestamp}.txt"
+    
+    synthesis_report = agent3.generate_final_report(
+        main_paper_content=main_paper_content,
+        fragmentation_analysis=fragmentation_analysis,
+        save_details_path=output_file
+    )
+    
+    print(f"\n✅ Agent 3 completed! Final synthesis saved to: {output_file}")
+
+def run_full_pipeline():
+    """Run the complete three-agent pipeline."""
+    print("\n🔄 FULL PIPELINE: Running All Three Agents")
+    print("-" * 50)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
+    # Step 1: Load reference papers
+    print("\n📚 STEP 1: Loading Reference Papers")
+    reference_files = get_pdf_files(REFERENCES_FOLDER)
+    if not reference_files:
+        print("❌ No reference papers found!")
+        return
+    
+    print(f"📋 Found {len(reference_files)} reference papers")
+    
+    # Extract texts
+    paper_texts = []
+    paper_titles = []
+    
+    for i, file_path in enumerate(reference_files, 1):
+        filename = os.path.basename(file_path)
+        print(f"  Processing {i}/{len(reference_files)}: {filename}")
+        
+        text = extract_text_from_pdf(file_path)
+        if text.strip():
+            paper_texts.append(text)
+            paper_titles.append(filename)
+    
+    if not paper_texts:
+        print("❌ No valid papers to process!")
+        return
+    
+    # Step 2: Run Agent 1 (PhD Student)
+    print("\n🎓 STEP 2: Agent 1 - PhD Student Summarization")
+    agent1 = PhDStudentAgent()
+    agent1_output = f"agent1_summaries_{timestamp}.txt"
+    
+    summaries = agent1.summarize_paper_batch(
+        paper_texts=paper_texts,
+        paper_titles=paper_titles,
+        save_path=agent1_output
+    )
+    
+    print(f"✅ Agent 1 completed: {len(summaries)} summaries")
+    
+    # Step 3: Run Agent 2 (Postdoc)
+    print("\n🔬 STEP 3: Agent 2 - Postdoc Fragmentation Analysis")
+    agent2 = PostdocAgent()
+    agent2_output = f"agent2_fragmentation_{timestamp}.txt"
+    
+    fragmentation_analysis = agent2.review_and_refine_batch(
+        summaries=summaries,
+        paper_titles=paper_titles,
+        save_path=agent2_output
+    )
+    
+    print("✅ Agent 2 completed: Fragmentation analysis ready")
+    
+    # Step 4: Load main paper
+    print("\n� STEP 4: Loading Main Paper")
+    main_paper_files = get_pdf_files(MAIN_PAPER_FOLDER)
+    if not main_paper_files:
+        print("❌ No main paper found!")
+        return
+    
+    main_paper_content = extract_text_from_pdf(main_paper_files[0])
+    main_paper_title = os.path.basename(main_paper_files[0])
+    print(f"📄 Main paper loaded: {main_paper_title}")
+    
+    # Step 5: Run Agent 3 (Professor)
+    print("\n🎓 STEP 5: Agent 3 - Professor Final Synthesis")
+    agent3 = ProfessorAgent()
+    agent3_output = f"agent3_synthesis_{timestamp}.txt"
+    
+    synthesis_report = agent3.generate_final_report(
+        main_paper_content=main_paper_content,
+        fragmentation_analysis=fragmentation_analysis,
+        save_details_path=agent3_output
+    )
+    
+    print("✅ Agent 3 completed: Final synthesis ready")
+    
+    # Final summary
+    print(f"\n🎉 PIPELINE COMPLETED!")
+    print("="*70)
+    print(f"📊 Reference Papers Processed: {len(paper_texts)}")
+    print(f"� Agent 1 Output: {agent1_output}")
+    print(f"📄 Agent 2 Output: {agent2_output}")
+    print(f"📄 Agent 3 Output: {agent3_output}")
+    print(f"⏰ Completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("="*70)
 
 def main():
-    """Main function that orchestrates the entire workflow."""
-    try:
-        print_header()
+    """Main function with menu for different execution modes."""
+    print_header()
+    
+    while True:
+        print("\n🔧 EXECUTION MODE SELECTION")
+        print("-" * 30)
+        print("1. Run Agent 1 Only (PhD Student - Paper Summarization)")
+        print("2. Run Agent 2 Only (Postdoc - Fragmentation Analysis)")
+        print("3. Run Agent 3 Only (Professor - Final Synthesis)")
+        print("4. Run Full Pipeline (All Three Agents)")
+        print("5. Exit")
         
-        # Step 1: Load main paper
-        main_paper_content, main_paper_title = load_main_paper()
+        choice = input("\nSelect option (1-5): ").strip()
         
-        # Step 2: Process reference papers
-        refined_summaries = process_reference_papers()
-        
-        # Step 3: Generate final analysis
-        final_report = generate_final_analysis(main_paper_content, refined_summaries)
-        
-        # Step 4: Save and display results
-        print("\n💾 STEP 4: Saving Results")
-        print("-" * 40)
-        
-        # Save to file
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_filename = f"analysis_report_{timestamp}.txt"
-        save_report(final_report, output_filename)
-        
-        # Display summary
-        print(f"\n🎉 ANALYSIS COMPLETE!")
-        print("=" * 70)
-        print(f"📊 Main Paper: {main_paper_title}")
-        print(f"📚 Reference Papers Analyzed: {len(refined_summaries)}")
-        print(f"📄 Report Saved: {output_filename}")
-        print(f"⏰ Completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print("=" * 70)
-        
-        # Option to display report
-        while True:
-            display = input("\n📖 Would you like to display the report now? (y/n): ").lower()
-            if display in ['y', 'yes']:
-                print("\n" + "="*70)
-                print("GENERATED REPORT:")
-                print("="*70)
-                print(final_report)
-                break
-            elif display in ['n', 'no']:
-                print(f"Report saved to {output_filename}")
+        try:
+            if choice == '1':
+                run_agent_1_only()
+            elif choice == '2':
+                run_agent_2_only()
+            elif choice == '3':
+                run_agent_3_only()
+            elif choice == '4':
+                run_full_pipeline()
+            elif choice == '5':
+                print("👋 Goodbye!")
                 break
             else:
-                print("Please enter 'y' or 'n'")
+                print("❌ Invalid choice. Please select 1-5.")
         
-    except KeyboardInterrupt:
-        print("\n\n⚠️  Process interrupted by user")
-    except Exception as e:
-        print(f"\n❌ Error: {str(e)}")
-        print("Please check your configuration and try again.")
+        except KeyboardInterrupt:
+            print("\n\n⚠️  Operation interrupted by user")
+        except Exception as e:
+            print(f"\n❌ Error: {str(e)}")
+            print("Please check your configuration and try again.")
 
 if __name__ == "__main__":
     main()

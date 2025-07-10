@@ -4,16 +4,16 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![GROQ](https://img.shields.io/badge/AI-GROQ%20API-orange.svg)](https://groq.com)
 
-A CLI-based academic research analysis system that uses AI agents to simulate a **PhD Student**, **Postdoc**, and **Professor** workflow for comprehensive literature review evaluation.
+A three-agent academic analysis pipeline that automates the process of analyzing research papers and generating comprehensive insights.
 
 ## 🚀 Features
 
 - **🎓 Three-Agent System**: PhD Student → Postdoc → Professor workflow
-- **💻 CLI Interface**: Professional command-line interface
-- **📚 Review Paper Focus**: Optimized for literature reviews and theoretical synthesis
-- **⚡ Scalable**: Handles 150+ reference papers efficiently
+- **💻 Multiple Interfaces**: Interactive menu, CLI, and programmatic access
+- **📚 Structured Analysis**: Paper summarization, fragmentation analysis, and synthesis
+- **⚡ Individual Agent Execution**: Each agent can be run independently
 - **🤖 AI-Powered**: Advanced language models via GROQ API
-- **📊 Production Ready**: Robust error handling and retry logic
+- **📊 Production Ready**: Robust error handling and file-based outputs
 
 ## 🎯 Quick Start
 
@@ -28,14 +28,59 @@ pip install -r requirements.txt
 # 3. Configure API key
 # Edit config.py and add your GROQ API key
 
-# 4. Run analysis
+# 4. Run analysis (Interactive Menu)
 python main.py
+
+# OR run individual agents via CLI
+python cli.py agent1  # PhD Student summarization
+python cli.py agent2  # Postdoc fragmentation analysis
+python cli.py agent3  # Professor synthesis
 ```
 
-## 📖 Documentation
+## 📖 Agent Specifications
 
-- **[📘 Complete Usage Guide](USAGE_GUIDE.md)** - Comprehensive instructions
-- **[✅ Project Status](CLIENT_FINAL_STATUS.md)** - Development completion summary
+### Agent 1 (PhD Student) - Paper Summarization
+
+**Input**: PDF files from `subFolder/`
+**Output**: `agent1_summaries_[timestamp].txt`
+
+**Structured Summary Format**:
+
+1. Full citation (authors, year, title, journal)
+2. Research question(s)
+3. Theoretical frameworks or lenses used
+4. Core theoretical constructs & definitions
+5. Key methods and data sources
+6. Main findings and conclusions
+7. Any stated limitations or boundary conditions
+
+### Agent 2 (Postdoc) - Fragmentation Analysis
+
+**Input**: Agent 1 summaries
+**Output**: `agent2_fragmentation_[timestamp].txt`
+
+**Analysis Sections**:
+
+- **Convergent themes**: Concepts appearing in 3+ papers (list + explanations)
+- **Divergent fragments**: Topics treated in isolation (list + how they diverge)
+- **Suggested integrative links**: Synthesis opportunities (bullet points)
+
+**Important Rule**: Only themes appearing in 3+ papers are classified as major themes.
+
+### Agent 3 (Professor) - Final Synthesis
+
+**Input**: Agent 2 fragmentation analysis + main paper
+**Output**: `agent3_synthesis_[timestamp].txt`
+
+**Synthesis Format**:
+
+1. **Theoretical Landscape**: 5-10 key convergences/divergences
+2. **For each major theme**:
+   - **Concept Match**: Does main paper address this? (Yes/No/Partial)
+   - **Theoretical Lens Match**: Same theoretical lens? (Yes/No/Partial)
+   - **Suggested Synthesis Novelty**: Integration/advancement opportunities
+3. **Future Research Areas**: Based on fragmentation analysis
+4. **Comparison**: With main paper's Discussion/Conclusion sections
 
 ## 🛠️ Installation
 

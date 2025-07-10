@@ -5,7 +5,7 @@ load_dotenv()
 
 # GROQ API Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")  # Default to llama-3.3-70b-versatile if not set
+GROQ_MODEL = os.getenv("GROQ_MODEL", "deepseek-r1-distill-llama-70b")  # Default to deepseek-r1-distill-llama-70b (most powerful model for academic analysis)
 
 # Processing Configuration
 CHUNK_SIZE = 4000  # Maximum tokens per chunk
@@ -18,68 +18,78 @@ OUTPUT_FILE = "analysis_report.txt"
 
 # Agent Prompts
 PHD_STUDENT_PROMPT = """
-You are a PhD student tasked with summarizing an academic paper. 
-Read the following text carefully and provide a comprehensive summary that includes:
-1. Main research question/objective
-2. Key methodology used
-3. Primary findings
-4. Theoretical contributions
-5. Limitations mentioned
+You are a scholarly literature summarization assistant. Your task is to read academic articles and distill their essential information in a consistent, structured format:
 
-Be thorough but concise. Focus on the academic rigor and scientific content.
+1. Full citation (authors, year, title, journal)
+2. Research question(s)
+3. Theoretical frameworks or lenses used
+4. Core theoretical constructs & definitions
+5. Key methods and data sources
+6. Main findings and conclusions
+7. Any stated limitations or boundary conditions
+
+Please provide a clear, structured summary with numbered sections for each field above.
 
 Text to summarize:
 {text}
 """
 
 POSTDOC_PROMPT = """
-You are a Postdoc researcher reviewing a PhD student's summary of an academic paper.
-Your task is to refine and improve the summary by:
-1. Ensuring all key points are captured accurately
-2. Adding any missing critical information
-3. Improving clarity and academic precision
-4. Correcting any misinterpretations
-5. Enhancing the theoretical depth
+You are an analytical agent specialized in mapping theory landscapes. Given a set of paper summaries, your task is to:
 
-Original summary:
-{summary}
+1. Identify concepts or themes that appear under multiple names (convergent)
+2. Flag topics treated in isolation across sub-fields (divergent)
+3. Highlight overlaps, gaps, and potential points of synthesis
 
-Please provide a refined and improved version:
+IMPORTANT RULE: Only list a theme if it appears in at least 3 of the papers; otherwise classify as 'minor fragment'
+
+Output your findings in three sections:
+- Convergent themes (list + brief explanation)
+- Divergent fragments (list + how they diverge)
+- Suggested integrative links (short bullet ideas)
+
+Paper summaries:
+{summaries}
 """
 
 PROFESSOR_PROMPT = """
-You are a senior Professor conducting a meta-analysis of academic literature that will be compared with a REVIEW PAPER. When analyzing 150+ reference papers, your goal is to identify the most significant theoretical convergences and divergences that a comprehensive review should address.
+You are a senior Professor agent responsible for final synthesis and comparison. Given the fragmentation analysis from Agent 2, your task is to:
 
-**CONVERGENT THEORETICAL PATTERNS (Aim for 5-10 key established consensus areas):**
-- Theoretical propositions that have achieved strong consensus across multiple studies
-- Consistent theoretical frameworks and conceptual models widely accepted in the field
-- Well-established theoretical relationships that most scholars agree upon
-- Common theoretical foundations that underpin the field
-- Shared conceptual definitions and theoretical constructs
-- Theoretical principles that have been consistently validated across different contexts
+1. Synthesize the main theoretical landscape (focus on 5-10 key convergences/divergences only)
+2. For each major theme, evaluate:
+   - Concept Match: Does the main paper address this concept? (Yes/No/Partial)
+   - Theoretical Lens Match: Does the main paper use the same theoretical lens? (Yes/No/Partial)
+   - Suggested Synthesis Novelty: How could the main paper or field integrate or advance this theme?
+3. Suggest future research areas based on the fragmentation analysis
+4. Compare findings with the main paper's Discussion/Conclusion sections
 
-**DIVERGENT THEORETICAL DEBATES (Aim for 5-10 key ongoing conflicts):**
-- Papers using the SAME theoretical framework but reaching OPPOSITE theoretical conclusions
-- Direct contradictions in theoretical interpretations of key concepts or phenomena
-- Competing theoretical models or frameworks for explaining the same phenomena
-- Unresolved theoretical disputes about fundamental mechanisms or processes
-- Studies that explicitly challenge or refute established theoretical positions
-- Ongoing theoretical tensions where different schools of thought offer conflicting explanations
+Fragmentation Analysis:
+{fragmentation_analysis}
 
-**ANALYSIS CRITERIA FOR REVIEW PAPER EVALUATION:**
-✅ FOCUS ON: Theoretical agreements and disagreements, conceptual consensus vs. debates, competing theoretical frameworks
-❌ IGNORE: Methodological differences, geographical contexts, or empirical approaches (unless they represent fundamental theoretical disagreements)
+Main Paper Content:
+{main_paper}
 
-**SCALING CONSIDERATION:**
-With 150+ papers, you should identify the major theoretical fault lines and consensus areas that any comprehensive review paper should acknowledge and address.
+Provide a structured analysis with clear sections for synthesis, comparison, and future research directions.
+"""
 
-**REVIEW PAPER CONTEXT:**
-Remember that your analysis will be used to evaluate how well a review paper captures and synthesizes the theoretical landscape of the field.
+PROFESSOR_PROMPT = """
+You are a senior Professor agent responsible for final synthesis and comparison. Given the fragmentation analysis from Agent 2, your task is to:
 
-Here are the refined summaries to analyze:
-{summaries}
+1. Synthesize the main theoretical landscape (focus on 5-10 key convergences/divergences only)
+2. For each major theme, evaluate:
+   - Concept Match: Does the main paper address this concept? (Yes/No/Partial)
+   - Theoretical Lens Match: Does the main paper use the same theoretical lens? (Yes/No/Partial)
+   - Suggested Synthesis Novelty: How could the main paper or field integrate or advance this theme?
+3. Suggest future research areas based on the fragmentation analysis
+4. Compare findings with the main paper's Discussion/Conclusion sections
 
-Provide a focused analysis identifying the key theoretical consensus areas and ongoing theoretical debates that a review paper should address:
+Fragmentation Analysis:
+{fragmentation_analysis}
+
+Main Paper Content:
+{main_paper}
+
+Provide a structured analysis with clear sections for synthesis, comparison, and future research directions.
 """
 
 COMPARISON_PROMPT = """
