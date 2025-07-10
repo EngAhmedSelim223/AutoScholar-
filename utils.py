@@ -4,6 +4,9 @@ import PyPDF2
 from groq import Groq
 from config import GROQ_API_KEY, GROQ_MODEL, MAX_RETRIES, CHUNK_SIZE
 
+# Debug print to see what model is being used
+print(f"🔍 DEBUG: Using GROQ_MODEL = {GROQ_MODEL}")
+
 def extract_text_from_pdf(pdf_path):
     """Extract text content from a PDF file."""
     try:
@@ -15,6 +18,50 @@ def extract_text_from_pdf(pdf_path):
             return text.strip()
     except Exception as e:
         print(f"Error extracting text from {pdf_path}: {str(e)}")
+        return ""
+
+def extract_text_from_word(word_path):
+    """Extract text content from a Word document (.docx or .doc)."""
+    try:
+        # Try to import python-docx
+        from docx import Document
+        
+        # For .docx files
+        if word_path.lower().endswith('.docx'):
+            doc = Document(word_path)
+            text = ""
+            for paragraph in doc.paragraphs:
+                text += paragraph.text + "\n"
+            return text.strip()
+        
+        # For .doc files, we need python-docx2txt or similar
+        elif word_path.lower().endswith('.doc'):
+            try:
+                import docx2txt
+                text = docx2txt.process(word_path)
+                return text.strip()
+            except ImportError:
+                print(f"⚠️  docx2txt not installed. Cannot process .doc files: {word_path}")
+                return ""
+        
+        return ""
+    except ImportError:
+        print(f"⚠️  python-docx not installed. Cannot process Word files: {word_path}")
+        return ""
+    except Exception as e:
+        print(f"Error extracting text from {word_path}: {str(e)}")
+        return ""
+
+def extract_text_from_file(file_path):
+    """Extract text from PDF or Word documents."""
+    file_ext = os.path.splitext(file_path)[1].lower()
+    
+    if file_ext == '.pdf':
+        return extract_text_from_pdf(file_path)
+    elif file_ext in ['.docx', '.doc']:
+        return extract_text_from_word(file_path)
+    else:
+        print(f"⚠️  Unsupported file type: {file_ext} for file: {file_path}")
         return ""
 
 def chunk_text(text, chunk_size=CHUNK_SIZE):
@@ -79,6 +126,7 @@ def call_groq_api(prompt_or_prompts: Union[str, List[str]], max_retries=MAX_RETR
     if batch_mode:
         # --- Batch API logic ---
         batch_file = "batch_file.jsonl"
+        print(f"🔍 DEBUG: Creating batch file with model: {GROQ_MODEL}")
         with open(batch_file, "w", encoding="utf-8") as f:
             for i, prompt in enumerate(prompts):
                 req = {
@@ -93,6 +141,7 @@ def call_groq_api(prompt_or_prompts: Union[str, List[str]], max_retries=MAX_RETR
                     }
                 }
                 f.write(json.dumps(req, ensure_ascii=False) + "\n")
+        print(f"🔍 DEBUG: Batch file created with {len(prompts)} requests using model: {GROQ_MODEL}")
 
         # Upload batch file
         file_obj = client.files.create(file=open(batch_file, "rb"), purpose="batch")
@@ -164,13 +213,21 @@ def call_groq_api(prompt_or_prompts: Union[str, List[str]], max_retries=MAX_RETR
             t.join()
         return results
 
-def get_pdf_files(folder_path):
-    """Get all PDF files from a folder."""
-    pdf_files = []
+def get_document_files(folder_path):
+    """Get all document files (PDF, Word) from a folder."""
+    doc_files = []
+    supported_extensions = ['.pdf', '.docx', '.doc']
+    
     for filename in os.listdir(folder_path):
-        if filename.lower().endswith('.pdf'):
-            pdf_files.append(os.path.join(folder_path, filename))
-    return pdf_files
+        file_ext = os.path.splitext(filename)[1].lower()
+        if file_ext in supported_extensions:
+            doc_files.append(os.path.join(folder_path, filename))
+    
+    return doc_files
+
+def get_pdf_files(folder_path):
+    """Get all PDF files from a folder (legacy function - kept for compatibility)."""
+    return get_document_files(folder_path)
 
 def save_report(content, filename):
     """Save content to a file."""

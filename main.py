@@ -16,7 +16,11 @@ import sys
 import time
 from datetime import datetime
 
-from utils import extract_text_from_pdf, get_pdf_files, save_report
+from utils import extract_text_from_file, get_document_files, save_report
+
+# Keep backward compatibility
+get_pdf_files = get_document_files
+extract_text_from_pdf = extract_text_from_file
 from phd_student_agent import PhDStudentAgent
 from postdoc_agent import PostdocAgent
 from professor_agent import ProfessorAgent

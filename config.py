@@ -5,7 +5,7 @@ load_dotenv()
 
 # GROQ API Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = os.getenv("GROQ_MODEL", "meta-llama/llama-4-maverick-17b-128e-instruct")  # Default to llama-4-scout (fastest & most cost-effective Llama 4 model for academic analysis)
+GROQ_MODEL = os.getenv("GROQ_MODEL", "meta-llama/llama-4-maverick-17b-128e-instruct")  # Default to llama-4-maverick (most powerful Llama 4 model for academic analysis)
 
 # Processing Configuration
 CHUNK_SIZE = 4000  # Maximum tokens per chunk
